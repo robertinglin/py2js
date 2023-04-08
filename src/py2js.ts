@@ -39,7 +39,7 @@ const py2js = (instanceId?: string) => {
       importedLibraries.add(library);
     }
 
-    const convert = (firstArg: string, funcArgs: any[]) => {
+    const convert = (firstArg: string, funcArgs: any[], isFunction = true) => {
       const toExecute: string[] = [firstArg];
       const values: any[] = [];
       funcArgs.forEach((arg, ind) => {
@@ -77,10 +77,14 @@ const py2js = (instanceId?: string) => {
           }
         }
       });
-      if (!toExecute[toExecute.length - 1].endsWith(", ")) {
-        toExecute[toExecute.length - 1] += ")";
+      if (isFunction) {
+        if (!toExecute[toExecute.length - 1].endsWith(", ")) {
+          toExecute[toExecute.length - 1] += ")";
+        } else {
+          toExecute.push(")");
+        }
       } else {
-        toExecute.push(")");
+        toExecute.push(" ");
       }
       return { toExecute, values };
     };
@@ -126,6 +130,18 @@ const py2js = (instanceId?: string) => {
               return createPointer(nextVar, promise);
             };
           },
+          set: (_target, setName: string, value: any) => {
+            const { toExecute, values } = convert(
+              `${varName}.${setName} =`,
+              [value],
+              false
+            );
+            // @ts-ignore
+            const promise = bridge.ex(toExecute, ...values);
+            queue.push(promise);
+
+            return true;
+          },
         }
       );
     };
@@ -150,6 +166,19 @@ const py2js = (instanceId?: string) => {
 
             return createPointer(varName, promise);
           };
+        },
+        set: (_target, setName: string, value: any) => {
+          const { toExecute, values } = convert(
+            `${library}.${setName} =`,
+            [value],
+            false
+          );
+
+          // @ts-ignore
+          const promise = bridge.ex(toExecute, ...values);
+          queue.push(promise);
+
+          return true;
         },
       }
     );

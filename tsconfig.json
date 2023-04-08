@@ -7,22 +7,32 @@
     }
   },
   "compilerOptions": {
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ESNext", "DOM"],
-    "moduleResolution": "Node",
-    "strict": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    "module": "commonjs",
     "esModuleInterop": true,
-    "noEmit": true,
+    "target": "es2017",
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "skipLibCheck": true,
-    "outDir": "./dist",
-    "typeRoots": ["./dist/", "./node_modules/@types"]
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "listEmittedFiles": true,
+    "listFiles": false,
+    "noEmitOnError": true,
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "declaration": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*", "src/types/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src/**/*"]
 }
