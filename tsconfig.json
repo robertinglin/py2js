@@ -1,0 +1,28 @@
+{
+  "ts-node": {
+    "files": true,
+    "typeRoots": ["./dist/", "./node_modules/@types"],
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "moduleResolution": "Node",
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "typeRoots": ["./dist/", "./node_modules/@types"]
+  },
+  "include": ["src"]
+}
