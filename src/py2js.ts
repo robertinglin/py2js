@@ -4,7 +4,7 @@ const instances = new Map<string, any>();
 
 const py2js = (instanceId?: string) => {
   if (!instanceId) {
-    instanceId = "default";
+    instanceId = "v" + Math.random().toString(36).substring(7);
   }
 
   if (instances.has(instanceId)) {
@@ -15,14 +15,27 @@ const py2js = (instanceId?: string) => {
 
   const bridge = pythonBridge({
     stdio: ["pipe", process.stdout, process.stderr],
+    cwd: process.cwd(),
   });
+
+  bridge.ex`
+  import os
+  import sys
+  sys.path.append(os.getcwd())
+  `;
+
   // bridge.stdout.pipe(process.stdout);
   const importedLibraries = new Set<string>();
 
-  const instance = (library: string) => {
+  const instance = (library: string, module?: string) => {
     if (!importedLibraries.has(library)) {
-      // @ts-ignore
-      queue.push(bridge.ex([`import ${library}`]));
+      if (module) {
+        // @ts-ignore
+        queue.push(bridge.ex([`from ${module} import ${library}`]));
+      } else {
+        // @ts-ignore
+        queue.push(bridge.ex([`import ${library}`]));
+      }
       importedLibraries.add(library);
     }
 
@@ -72,12 +85,13 @@ const py2js = (instanceId?: string) => {
       return { toExecute, values };
     };
 
-    const createPointer = (varName: string) => {
+    const createPointer = (varName: string, promise: Promise<any>) => {
       const queuePosition = queue.length;
       return new Proxy(
         {
           type: "pointer",
           var: varName,
+          promise: promise,
           __print: () => {
             const toExecute = `print(${varName})`;
             // @ts-ignore
@@ -106,9 +120,10 @@ const py2js = (instanceId?: string) => {
               );
 
               // @ts-ignore
-              queue.push(bridge.ex(toExecute, ...values));
+              const promise = bridge.ex(toExecute, ...values);
+              queue.push(promise);
 
-              return createPointer(nextVar);
+              return createPointer(nextVar, promise);
             };
           },
         }
@@ -130,9 +145,10 @@ const py2js = (instanceId?: string) => {
             );
 
             // @ts-ignore
-            queue.push(bridge.ex(toExecute, ...values));
+            const promise = bridge.ex(toExecute, ...values);
+            queue.push(promise);
 
-            return createPointer(varName);
+            return createPointer(varName, promise);
           };
         },
       }
@@ -141,10 +157,12 @@ const py2js = (instanceId?: string) => {
 
   instances.set(instanceId, instance);
 
-  instance.__bridge = bridge;
+  instance.bridge = bridge;
   instance.end = () => {
     bridge.end();
+    if (instanceId) instances.delete(instanceId);
   };
+  instance.id = instanceId;
 
   return instance;
 };
