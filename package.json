@@ -1,6 +1,5 @@
 {
   "name": "py2js",
-  "private": true,
   "main": "dist/py2js.es.js",
   "version": "0.0.1",
   "license": "MIT",
