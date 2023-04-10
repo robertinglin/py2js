@@ -2,6 +2,14 @@ import { pythonBridge } from "python-bridge";
 
 const instances = new Map<string, any>();
 
+const showDebug = false;
+
+const DEBUG = (...args: any[]) => {
+  if (showDebug) {
+    console.log(...args);
+  }
+};
+
 const py2js = (instanceId?: string) => {
   if (!instanceId) {
     instanceId = "v" + Math.random().toString(36).substring(7);
@@ -42,12 +50,30 @@ const py2js = (instanceId?: string) => {
     const convert = (firstArg: string, funcArgs: any[], isFunction = true) => {
       const toExecute: string[] = [firstArg];
       const values: any[] = [];
+
+      DEBUG(funcArgs, firstArg);
+
       funcArgs.forEach((arg, ind) => {
         if (typeof arg === "object" && arg.type === "pointer") {
           toExecute[toExecute.length - 1] += arg.var;
           if (ind !== funcArgs.length - 1) {
             toExecute[toExecute.length - 1] += ", ";
           }
+        } else if (
+          typeof arg === "object" &&
+          Object.keys(arg).every((key) => key.startsWith("="))
+        ) {
+          Object.keys(arg).forEach((key, ind) => {
+            if (ind !== 0) {
+              toExecute.push(", ");
+            }
+            toExecute[toExecute.length - 1] += `${key.slice(1)}=`;
+            if (typeof arg[key] === "object" && arg[key].type === "pointer") {
+              toExecute[toExecute.length - 1] += arg[key].var;
+            } else {
+              values.push(arg[key]);
+            }
+          });
         } else {
           if (ind !== funcArgs.length - 1) {
             toExecute.push(", ");
@@ -78,7 +104,7 @@ const py2js = (instanceId?: string) => {
         }
       });
       if (isFunction) {
-        if (!toExecute[toExecute.length - 1].endsWith(", ")) {
+        if (values.length === 0 || toExecute[toExecute.length - 1] === "]") {
           toExecute[toExecute.length - 1] += ")";
         } else {
           toExecute.push(")");
@@ -123,6 +149,8 @@ const py2js = (instanceId?: string) => {
                 Array.from(args)
               );
 
+              DEBUG("POINTER", toExecute, values);
+
               // @ts-ignore
               const promise = bridge.ex(toExecute, ...values);
               queue.push(promise);
@@ -136,6 +164,7 @@ const py2js = (instanceId?: string) => {
               [value],
               false
             );
+            DEBUG("POINTERSET", toExecute, values);
             // @ts-ignore
             const promise = bridge.ex(toExecute, ...values);
             queue.push(promise);
@@ -159,6 +188,7 @@ const py2js = (instanceId?: string) => {
               `${varName} = ${library}.${functionName}(`,
               Array.from(args)
             );
+            DEBUG("COREGET", toExecute, values);
 
             // @ts-ignore
             const promise = bridge.ex(toExecute, ...values);
@@ -173,6 +203,7 @@ const py2js = (instanceId?: string) => {
             [value],
             false
           );
+          DEBUG("CORESET", toExecute, values);
 
           // @ts-ignore
           const promise = bridge.ex(toExecute, ...values);
