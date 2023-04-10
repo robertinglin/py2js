@@ -93,7 +93,11 @@ const py2js = (instanceId?: string) => {
                 }
               }
             }
-            if (toExecute[toExecute.length - 1] === ", ") {
+            if (
+              toExecute[toExecute.length - 1] === ", " ||
+              (toExecute[toExecute.length - 1].endsWith("[") &&
+                values.length !== 0)
+            ) {
               toExecute.push("]");
             } else {
               toExecute[toExecute.length - 1] += "]";

@@ -17,3 +17,37 @@ test("runs", async () => {
     py.end();
   }
 });
+
+test("single object in array", async () => {
+  const py = py2js();
+  try {
+    const pt = py("pytest", "tests.pytest");
+    const test = pt.test();
+    const result = await test
+      .arrayTest([{ woo: "some named variable" }])
+      .__get();
+    expect(result).toStrictEqual([{ woo: "some named variable" }]);
+  } finally {
+    py.end();
+  }
+});
+
+test("multiple objects in array", async () => {
+  const py = py2js();
+  try {
+    const pt = py("pytest", "tests.pytest");
+    const test = pt.test();
+    const result = await test
+      .arrayTest([
+        { woo: "some named variable" },
+        { hoo: "some more variables" },
+      ])
+      .__get();
+    expect(result).toStrictEqual([
+      { woo: "some named variable" },
+      { hoo: "some more variables" },
+    ]);
+  } finally {
+    py.end();
+  }
+});
