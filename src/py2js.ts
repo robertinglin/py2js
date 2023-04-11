@@ -55,7 +55,7 @@ const py2js = (instanceId?: string) => {
 
       funcArgs.forEach((arg, ind) => {
         if (typeof arg === "object" && arg.type === "pointer") {
-          toExecute[toExecute.length - 1] += arg.var;
+          toExecute[toExecute.length - 1] += arg.__var;
           if (ind !== funcArgs.length - 1) {
             toExecute[toExecute.length - 1] += ", ";
           }
@@ -69,7 +69,7 @@ const py2js = (instanceId?: string) => {
             }
             toExecute[toExecute.length - 1] += `${key.slice(1)}=`;
             if (typeof arg[key] === "object" && arg[key].type === "pointer") {
-              toExecute[toExecute.length - 1] += arg[key].var;
+              toExecute[toExecute.length - 1] += arg[key].__var;
             } else {
               values.push(arg[key]);
             }
@@ -82,7 +82,7 @@ const py2js = (instanceId?: string) => {
             toExecute[toExecute.length - 1] += "[";
             for (let i = 0; i < arg.length; i++) {
               if (typeof arg[i] === "object" && arg[i].type === "pointer") {
-                toExecute[toExecute.length - 1] += arg[i].var;
+                toExecute[toExecute.length - 1] += arg[i].__var;
                 if (i !== arg.length - 1) {
                   toExecute[toExecute.length - 1] += ", ";
                 }
@@ -119,12 +119,31 @@ const py2js = (instanceId?: string) => {
       return { toExecute, values };
     };
 
+    const execute = (toExecute: string[], values: any[]) => {
+      const promise = new Promise((resolve, reject) => {
+        bridge
+          // @ts-ignore
+          .ex(toExecute, ...values)
+          .then((res: any) => {
+            resolve(res);
+          })
+          .catch((err: any) => {
+            const error = new Error(err.exception.message);
+            // @ts-ignore
+            error.exception = err;
+            reject(error);
+          });
+      });
+      queue.push(promise);
+      return promise;
+    };
+
     const createPointer = (varName: string, promise: Promise<any>) => {
       const queuePosition = queue.length;
       return new Proxy(
         {
           type: "pointer",
-          var: varName,
+          __var: varName,
           promise: promise,
           __print: () => {
             const toExecute = `print(${varName})`;
@@ -155,11 +174,7 @@ const py2js = (instanceId?: string) => {
 
               DEBUG("POINTER", toExecute, values);
 
-              // @ts-ignore
-              const promise = bridge.ex(toExecute, ...values);
-              queue.push(promise);
-
-              return createPointer(nextVar, promise);
+              return createPointer(nextVar, execute(toExecute, values));
             };
           },
           set: (_target, setName: string, value: any) => {
@@ -169,9 +184,7 @@ const py2js = (instanceId?: string) => {
               false
             );
             DEBUG("POINTERSET", toExecute, values);
-            // @ts-ignore
-            const promise = bridge.ex(toExecute, ...values);
-            queue.push(promise);
+            execute(toExecute, values);
 
             return true;
           },
@@ -194,11 +207,7 @@ const py2js = (instanceId?: string) => {
             );
             DEBUG("COREGET", toExecute, values);
 
-            // @ts-ignore
-            const promise = bridge.ex(toExecute, ...values);
-            queue.push(promise);
-
-            return createPointer(varName, promise);
+            return createPointer(varName, execute(toExecute, values));
           };
         },
         set: (_target, setName: string, value: any) => {
@@ -209,10 +218,7 @@ const py2js = (instanceId?: string) => {
           );
           DEBUG("CORESET", toExecute, values);
 
-          // @ts-ignore
-          const promise = bridge.ex(toExecute, ...values);
-          queue.push(promise);
-
+          execute(toExecute, values);
           return true;
         },
       }

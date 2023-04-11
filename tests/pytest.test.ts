@@ -51,3 +51,18 @@ test("multiple objects in array", async () => {
     py.end();
   }
 });
+
+test("exception", async () => {
+  const py = py2js();
+  try {
+    const pt = py("pytest", "tests.pytest");
+    const test = pt.test();
+    await test.exceptionTest().promise;
+  } catch (e) {
+    expect(e.message).toBe("test exception");
+    return;
+  } finally {
+    py.end();
+  }
+  expect("to never get here").toEqual(true);
+});

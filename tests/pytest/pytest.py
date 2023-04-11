@@ -15,3 +15,6 @@ class test():
     for i in args:
       out.append(i)
     return out
+
+  def exceptionTest(self):
+    raise Exception('test exception')
