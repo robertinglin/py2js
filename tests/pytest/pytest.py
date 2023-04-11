@@ -18,3 +18,6 @@ class test():
 
   def exceptionTest(self):
     raise Exception('test exception')
+
+  def noReturnTest(self):
+    print('test no return')

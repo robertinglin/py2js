@@ -66,3 +66,17 @@ test("exception", async () => {
   }
   expect("to never get here").toEqual(true);
 });
+
+test("undefined var", async () => {
+  const py = py2js();
+  try {
+    const pt = py("pytest", "tests.pytest");
+    const test = pt.test();
+    const pointer = test.noReturnTest();
+    py.bridge.ex([`del ${pointer.__var}`]);
+    const res = await pointer.__get();
+    expect(res).toBe(undefined);
+  } finally {
+    py.end();
+  }
+});

@@ -139,7 +139,6 @@ const py2js = (instanceId?: string) => {
     };
 
     const createPointer = (varName: string, promise: Promise<any>) => {
-      const queuePosition = queue.length;
       return new Proxy(
         {
           type: "pointer",
@@ -151,9 +150,14 @@ const py2js = (instanceId?: string) => {
             queue.push(bridge.ex([toExecute]));
           },
           __get: async () => {
-            await Promise.all(queue.slice(queuePosition));
+            await promise;
             // @ts-ignore
-            return await bridge([varName]);
+            return await bridge([varName]).catch((err: any) => {
+              if (err.exception.type.name !== "NameError") {
+                throw err;
+              }
+              return undefined;
+            });
           },
         },
         {
