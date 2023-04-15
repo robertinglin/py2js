@@ -54,7 +54,7 @@ const py2js = (instanceId?: string) => {
       DEBUG(funcArgs, firstArg);
 
       funcArgs.forEach((arg, ind) => {
-        if (typeof arg === "object" && arg.type === "pointer") {
+        if (arg.__type === "pointer") {
           toExecute[toExecute.length - 1] += arg.__var;
           if (ind !== funcArgs.length - 1) {
             toExecute[toExecute.length - 1] += ", ";
@@ -68,7 +68,7 @@ const py2js = (instanceId?: string) => {
               toExecute.push(", ");
             }
             toExecute[toExecute.length - 1] += `${key.slice(1)}=`;
-            if (typeof arg[key] === "object" && arg[key].type === "pointer") {
+            if (arg[key]?.__type === "pointer") {
               toExecute[toExecute.length - 1] += arg[key].__var;
             } else {
               values.push(arg[key]);
@@ -81,7 +81,7 @@ const py2js = (instanceId?: string) => {
           if (Array.isArray(arg)) {
             toExecute[toExecute.length - 1] += "[";
             for (let i = 0; i < arg.length; i++) {
-              if (typeof arg[i] === "object" && arg[i].type === "pointer") {
+              if (arg[i]?.__type === "pointer") {
                 toExecute[toExecute.length - 1] += arg[i].__var;
                 if (i !== arg.length - 1) {
                   toExecute[toExecute.length - 1] += ", ";
@@ -108,11 +108,19 @@ const py2js = (instanceId?: string) => {
         }
       });
       if (isFunction) {
-        if (values.length === 0 || toExecute[toExecute.length - 1] === "]") {
-          toExecute[toExecute.length - 1] += ")";
-        } else {
+        if (
+          toExecute[toExecute.length - 1].endsWith(", ") ||
+          (values.length !== 0 && toExecute[toExecute.length - 1].endsWith("("))
+        ) {
           toExecute.push(")");
+        } else {
+          toExecute[toExecute.length - 1] += ")";
         }
+        // if (values.length === 0 || toExecute[toExecute.length - 1] === "]") {
+        //   toExecute[toExecute.length - 1] += ")";
+        // } else {
+        //   toExecute.push(")");
+        // }
       } else {
         toExecute.push(" ");
       }
@@ -139,65 +147,101 @@ const py2js = (instanceId?: string) => {
     };
 
     const createPointer = (varName: string, promise: Promise<any>) => {
-      return new Proxy(
-        {
-          type: "pointer",
-          __var: varName,
-          promise: promise,
-          __print: () => {
-            const toExecute = `print(${varName})`;
-            // @ts-ignore
-            queue.push(bridge.ex([toExecute]));
-          },
-          __get: async () => {
-            await promise;
-            // @ts-ignore
-            return await bridge([varName]).catch((err: any) => {
-              if (err.exception.type.name !== "NameError") {
-                throw err;
-              }
-              return undefined;
-            });
-          },
-        },
-        {
-          get: (_target, functionName: string) => {
-            // @ts-ignore
-            if (_target[functionName]) {
-              // @ts-ignore
-              return _target[functionName];
-            }
-            if (functionName === "then") return null;
-            return (...args: any[]) => {
-              // create random var name
-              const nextVar = "v" + Math.random().toString(36).substring(7);
-              const { toExecute, values } = convert(
-                `${nextVar} = ${varName}.${functionName}(`,
-                Array.from(args)
-              );
+      const pointerFunc = (...args: any[]) => {
+        // create random var name
+        const nextVar = "v" + Math.random().toString(36).substring(7);
+        const { toExecute, values } = convert(
+          `${nextVar} = ${varName}(`,
+          Array.from(args)
+        );
 
-              DEBUG("POINTER", toExecute, values);
+        DEBUG("POINTER", toExecute, values);
 
-              return createPointer(nextVar, execute(toExecute, values));
-            };
-          },
-          set: (_target, setName: string, value: any) => {
-            const { toExecute, values } = convert(
-              `${varName}.${setName} =`,
-              [value],
-              false
-            );
-            DEBUG("POINTERSET", toExecute, values);
-            execute(toExecute, values);
+        return createPointer(nextVar, execute(toExecute, values));
+      };
 
-            return true;
-          },
+      pointerFunc.__type = "pointer";
+      pointerFunc.__var = varName;
+      pointerFunc.promise = promise;
+      pointerFunc.__print = () => {
+        const toExecute = `print(${varName})`;
+        // @ts-ignore
+        queue.push(bridge.ex([toExecute]));
+      };
+      pointerFunc.__get = async (pylambda?: string) => {
+        await promise;
+
+        if (pylambda) {
+          // @ts-ignore
+          return await bridge([`(lambda ${pylambda})(${varName})`]);
         }
-      );
+
+        // @ts-ignore
+        return await bridge([varName]).catch((err: any) => {
+          if (err.exception.type.name !== "NameError") {
+            throw err;
+          }
+          return undefined;
+        });
+      };
+      pointerFunc.__map = (pylambda: string) => {
+        const nextVar = "v" + Math.random().toString(36).substring(7);
+        const toExecute = `${nextVar} = list(map(lambda ${pylambda}, ${varName}))`; // `${varName}.map(${pylambda})`;
+        return createPointer(nextVar, execute([toExecute], []));
+      };
+      return new Proxy(pointerFunc, {
+        get: (_target, functionName: string): any => {
+          // @ts-ignore
+          if (_target[functionName]) {
+            // @ts-ignore
+            return _target[functionName];
+          }
+          if (functionName === "then") return null;
+          const subPointerFunc = (...args: any[]) => {
+            // create random var name
+            const nextVar = "v" + Math.random().toString(36).substring(7);
+            const { toExecute, values } = convert(
+              `${nextVar} = ${varName}.${functionName}(`,
+              Array.from(args)
+            );
+
+            DEBUG("POINTER", toExecute, values);
+
+            return createPointer(nextVar, execute(toExecute, values));
+          };
+
+          subPointerFunc.__type = "pointer";
+          subPointerFunc.__var = `${varName}.${functionName}`;
+          subPointerFunc.promise = promise;
+
+          return subPointerFunc;
+        },
+        set: (_target, setName: string, value: any) => {
+          const { toExecute, values } = convert(
+            `${varName}.${setName} =`,
+            [value],
+            false
+          );
+          DEBUG("POINTERSET", toExecute, values);
+          execute(toExecute, values);
+
+          return true;
+        },
+      });
     };
 
     return new Proxy(
-      {},
+      (...args: any[]) => {
+        // create random var name
+        const varName = "v" + Math.random().toString(36).substring(7);
+        const { toExecute, values } = convert(
+          `${varName} = ${library}(`,
+          Array.from(args)
+        );
+        DEBUG("COREGET", toExecute, values);
+
+        return createPointer(varName, execute(toExecute, values));
+      },
       {
         get: (_target, functionName: string) => {
           if (functionName === "then") return null;
