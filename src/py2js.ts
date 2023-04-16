@@ -51,79 +51,71 @@ const py2js = (instanceId?: string) => {
       const toExecute: string[] = [firstArg];
       const values: any[] = [];
 
-      DEBUG(funcArgs, firstArg);
+      DEBUG("convert", funcArgs, firstArg);
 
-      funcArgs.forEach((arg, ind) => {
-        if (arg.__type === "pointer") {
-          toExecute[toExecute.length - 1] += arg.__var;
-          if (ind !== funcArgs.length - 1) {
-            toExecute[toExecute.length - 1] += ", ";
+      const hasPointer = (arg: any): boolean => {
+        if (Array.isArray(arg)) {
+          return arg.some((item) => hasPointer(item));
+        }
+        if (typeof arg === "function") {
+          return arg.__var !== undefined;
+        }
+        return false;
+      };
+
+      funcArgs.forEach((arg) => {
+        if (!hasPointer(arg)) {
+          if (
+            typeof arg === "object" &&
+            Object.keys(arg).every((key) => key.startsWith("="))
+          ) {
+            Object.keys(arg).forEach((key) => {
+              if (!toExecute[toExecute.length - 1].endsWith("(")) {
+                toExecute[toExecute.length - 1] += ", ";
+              }
+              toExecute[toExecute.length - 1] += `${key.slice(1)}=`;
+              if (hasPointer(arg[key])) {
+                toExecute[toExecute.length - 1] += arg[key].__var;
+              } else {
+                values.push(arg[key]);
+                toExecute.push("");
+              }
+            });
+          } else {
+            if (!toExecute[toExecute.length - 1].endsWith("(")) {
+              toExecute[toExecute.length - 1] += ", ";
+            }
+            toExecute.push("");
+            values.push(arg);
           }
-        } else if (
-          typeof arg === "object" &&
-          Object.keys(arg).every((key) => key.startsWith("="))
-        ) {
-          Object.keys(arg).forEach((key, ind) => {
-            if (ind !== 0) {
-              toExecute.push(", ");
-            }
-            toExecute[toExecute.length - 1] += `${key.slice(1)}=`;
-            if (arg[key]?.__type === "pointer") {
-              toExecute[toExecute.length - 1] += arg[key].__var;
-            } else {
-              values.push(arg[key]);
-            }
-          });
         } else {
-          if (ind !== funcArgs.length - 1) {
-            toExecute.push(", ");
-          }
-          if (Array.isArray(arg)) {
+          if (typeof arg === "function") {
+            if (!toExecute[toExecute.length - 1].endsWith("(")) {
+              toExecute[toExecute.length - 1] += ", ";
+            }
+            toExecute[toExecute.length - 1] += arg.__var;
+          } else if (Array.isArray(arg)) {
             toExecute[toExecute.length - 1] += "[";
             for (let i = 0; i < arg.length; i++) {
-              if (arg[i]?.__type === "pointer") {
+              if (i !== 0) {
+                toExecute[toExecute.length - 1] += ", ";
+              }
+              if (hasPointer(arg[i])) {
                 toExecute[toExecute.length - 1] += arg[i].__var;
-                if (i !== arg.length - 1) {
-                  toExecute[toExecute.length - 1] += ", ";
-                }
               } else {
                 values.push(arg[i]);
-                if (i !== arg.length - 1) {
-                  toExecute.push(", ");
-                }
+                toExecute.push("");
               }
             }
-            if (
-              toExecute[toExecute.length - 1] === ", " ||
-              (toExecute[toExecute.length - 1].endsWith("[") &&
-                values.length !== 0)
-            ) {
-              toExecute.push("]");
-            } else {
-              toExecute[toExecute.length - 1] += "]";
-            }
-          } else {
-            values.push(arg);
+            toExecute[toExecute.length - 1] += "]";
           }
         }
       });
+
       if (isFunction) {
-        if (
-          toExecute[toExecute.length - 1].endsWith(", ") ||
-          (values.length !== 0 && toExecute[toExecute.length - 1].endsWith("("))
-        ) {
-          toExecute.push(")");
-        } else {
-          toExecute[toExecute.length - 1] += ")";
-        }
-        // if (values.length === 0 || toExecute[toExecute.length - 1] === "]") {
-        //   toExecute[toExecute.length - 1] += ")";
-        // } else {
-        //   toExecute.push(")");
-        // }
-      } else {
-        toExecute.push(" ");
+        toExecute[toExecute.length - 1] += ")";
       }
+
       return { toExecute, values };
     };
 
@@ -233,7 +225,7 @@ const py2js = (instanceId?: string) => {
     return new Proxy(
       (...args: any[]) => {
         // create random var name
-        const varName = "v" + Math.random().toString(36).substring(7);
+        const varName = "v" + Math.random().toString(36).substring(7) + "_";
         const { toExecute, values } = convert(
           `${varName} = ${library}(`,
           Array.from(args)
@@ -248,7 +240,7 @@ const py2js = (instanceId?: string) => {
 
           return (...args: any[]) => {
             // create random var name
-            const varName = "v" + Math.random().toString(36).substring(7);
+            const varName = "v" + Math.random().toString(36).substring(7) + "_";
             const { toExecute, values } = convert(
               `${varName} = ${library}.${functionName}(`,
               Array.from(args)

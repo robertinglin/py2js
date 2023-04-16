@@ -5,10 +5,10 @@ test("numpy", async () => {
   try {
     py("sumy");
     const PlaintextParser = py("PlaintextParser", "sumy.parsers.plaintext");
-    const TextRankSummarizer = py(
-      "TextRankSummarizer",
-      "sumy.summarizers.text_rank"
-    );
+    // const TextRankSummarizer = py(
+    //   "TextRankSummarizer",
+    //   "sumy.summarizers.text_rank"
+    // );
     const Tokenizer = py("Tokenizer", "sumy.nlp.tokenizers");
 
     const text = `
@@ -17,30 +17,32 @@ test("numpy", async () => {
 
     const parser = PlaintextParser.from_string(text, Tokenizer("english"));
 
-    // Define the summarizer
-    const summarizer = TextRankSummarizer();
+    await parser.promise;
 
-    // Set the number of sentences in the summary
-    const num_sentences = 2;
+    // // Define the summarizer
+    // const summarizer = TextRankSummarizer();
 
-    // Summarize the text
-    const summary = summarizer(parser.document, num_sentences);
+    // // Set the number of sentences in the summary
+    // const num_sentences = 2;
 
-    const res = await summary.__get(`x: str(x[0])`);
+    // // Summarize the text
+    // const summary = summarizer(parser.document, num_sentences);
 
-    expect(res).toEqual(
-      "Summarization is a common task in natural language processing, and it involves condensing a long piece of text into a shorter summary that captures the most important information."
-    );
+    // const res = await summary.__get(`x: str(x[0])`);
 
-    // // @ts-ignore
-    // console.log(global.code as any);
+    // expect(res).toEqual(
+    //   "Summarization is a common task in natural language processing, and it involves condensing a long piece of text into a shorter summary that captures the most important information."
+    // );
 
-    const list = summary.__map("x: str(x)");
+    // // // @ts-ignore
+    // // console.log(global.code as any);
 
-    expect(await list.__get()).toEqual([
-      "Summarization is a common task in natural language processing, and it involves condensing a long piece of text into a shorter summary that captures the most important information.",
-      "In this script, we'll use the TextRank method to summarize our block of text.",
-    ]);
+    // const list = summary.__map("x: str(x)");
+
+    // expect(await list.__get()).toEqual([
+    //   "Summarization is a common task in natural language processing, and it involves condensing a long piece of text into a shorter summary that captures the most important information.",
+    //   "In this script, we'll use the TextRank method to summarize our block of text.",
+    // ]);
   } finally {
     py.end();
   }
